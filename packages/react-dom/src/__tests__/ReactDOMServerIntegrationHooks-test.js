@@ -11,6 +11,23 @@
 
 'use strict';
 
+const readDataFromStream = stream => {
+  return new Promise(function(resolve, reject) {
+    const chunks = [];
+
+    stream.on('readable', () => {
+      let chunk;
+      while (null !== (chunk = stream.read())) {
+        chunks.push(chunk);
+      }
+    });
+
+    stream.on('end', () => {
+      resolve(chunks.join(''));
+    });
+  });
+};
+
 const ReactDOMServerIntegrationUtils = require('./utils/ReactDOMServerIntegrationTestUtils');
 
 let React;
@@ -1207,8 +1224,8 @@ describe('ReactDOMServerHooks', () => {
       streamOne._read(10);
       streamTwo._read(10);
 
-      containerOne.innerHTML = streamOne.read();
-      containerTwo.innerHTML = streamTwo.read();
+      containerOne.innerHTML = await readDataFromStream(streamOne);
+      containerTwo.innerHTML = await readDataFromStream(streamTwo);
 
       expect(containerOne.children[0].getAttribute('id')).not.toEqual(
         containerOne.children[1].getAttribute('id'),

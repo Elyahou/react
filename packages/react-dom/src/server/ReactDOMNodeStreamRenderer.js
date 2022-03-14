@@ -29,11 +29,13 @@ class ReactMarkupReadableStream extends Readable {
   }
 
   _read(size) {
-    try {
-      this.push(this.partialRenderer.read(size));
-    } catch (err) {
-      this.destroy(err);
-    }
+    setImmediate(() => {
+      try {
+        this.push(this.partialRenderer.read(size))
+      } catch (err) {
+        this.destroy(err);
+      }
+    });
   }
 }
 /**

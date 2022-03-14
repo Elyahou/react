@@ -34,6 +34,31 @@ function initModules() {
 
 const {resetModules, itRenders} = ReactDOMServerIntegrationUtils(initModules);
 
+const readDataFromStream = stream => {
+  return new Promise(function(resolve, reject) {
+    const chunks = [];
+
+    stream.on('readable', () => {
+      let chunk;
+      while (null !== (chunk = stream.read())) {
+        chunks.push(chunk);
+      }
+    });
+
+    stream.on('end', () => {
+      resolve(chunks.join(''));
+    });
+  });
+};
+
+const readOnceFromStream = stream => {
+  return new Promise(function(resolve, reject) {
+    stream.on('readable', () => {
+      resolve(stream.read());
+    });
+  });
+};
+
 describe('ReactDOMServerIntegration', () => {
   beforeEach(() => {
     resetModules();
@@ -395,7 +420,7 @@ describe('ReactDOMServerIntegration', () => {
       },
     );
 
-    it('does not pollute parallel node streams', () => {
+    it('does not pollute parallel node streams', async () => {
       const LoggedInUser = React.createContext();
 
       const AppWithUser = user => (
@@ -424,11 +449,11 @@ describe('ReactDOMServerIntegration', () => {
       streamAmy._read(20);
       streamBob._read(20);
 
-      expect(streamAmy.read()).toBe('<header>Amy</header><footer>Amy</footer>');
-      expect(streamBob.read()).toBe('<header>Bob</header><footer>Bob</footer>');
+      expect(await readDataFromStream(streamAmy)).toBe('<header>Amy</header><footer>Amy</footer>');
+      expect(await readDataFromStream(streamBob)).toBe('<header>Bob</header><footer>Bob</footer>');
     });
 
-    it('does not pollute parallel node streams when many are used', () => {
+    it('does not pollute parallel node streams when many are used', async () => {
       const CurrentIndex = React.createContext();
 
       const NthRender = index => (
@@ -480,14 +505,14 @@ describe('ReactDOMServerIntegration', () => {
 
       // Assert that all stream rendered the expected output.
       for (let i = 0; i < streamCount; i++) {
-        expect(streams[i].read()).toBe(
+        expect(await readDataFromStream(streams[i])).toBe(
           '<header>' + i + '</header><footer>' + i + '</footer>',
         );
       }
     });
 
     // Regression test for https://github.com/facebook/react/issues/14705
-    it('does not pollute later renders when stream destroyed', () => {
+    it('does not pollute later renders when stream destroyed', async () => {
       const LoggedInUser = React.createContext('default');
 
       const AppWithUser = user => (
@@ -507,6 +532,7 @@ describe('ReactDOMServerIntegration', () => {
 
       // Read enough to render Provider but not enough for it to be exited
       stream._read(10);
+      await readOnceFromStream(stream);
       expect(LoggedInUser[threadID]).toBe('Amy');
 
       stream.destroy();
@@ -523,13 +549,11 @@ describe('ReactDOMServerIntegration', () => {
       // otherwise this test is not testing what it's meant to
       expect(stream2.partialRenderer.threadID).toBe(threadID);
 
-      const markup = stream2.read(Infinity);
-
-      expect(markup).toBe('default');
+      expect(await readDataFromStream(stream2)).toBe('default');
     });
 
     // Regression test for https://github.com/facebook/react/issues/14705
-    it('frees context value reference when stream destroyed', () => {
+    it('frees context value reference when stream destroyed', async () => {
       const LoggedInUser = React.createContext('default');
 
       const AppWithUser = user => (
@@ -549,6 +573,7 @@ describe('ReactDOMServerIntegration', () => {
 
       // Read enough to render Provider but not enough for it to be exited
       stream._read(10);
+      await readOnceFromStream(stream);
       expect(LoggedInUser[threadID]).toBe('Amy');
 
       stream.destroy();

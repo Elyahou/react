@@ -10,6 +10,23 @@
 
 'use strict';
 
+const readDataFromStream = stream => {
+  return new Promise(function(resolve, reject) {
+    const chunks = [];
+
+    stream.on('readable', () => {
+      let chunk;
+      while (null !== (chunk = stream.read())) {
+        chunks.push(chunk);
+      }
+    });
+
+    stream.on('end', () => {
+      resolve(chunks.join(''));
+    });
+  });
+};
+
 let React;
 let ReactDOMServer;
 let PropTypes;
@@ -577,10 +594,10 @@ describe('ReactDOMServer', () => {
   });
 
   describe('renderToNodeStream', () => {
-    it('should generate simple markup', () => {
+    it('should generate simple markup', async () => {
       const SuccessfulElement = React.createElement(() => <img />);
       const response = ReactDOMServer.renderToNodeStream(SuccessfulElement);
-      expect(response.read().toString()).toMatch(
+      expect(await readDataFromStream(response)).toMatch(
         new RegExp('<img data-reactroot=""' + '/>'),
       );
     });
@@ -600,12 +617,12 @@ describe('ReactDOMServer', () => {
   });
 
   describe('renderToStaticNodeStream', () => {
-    it('should generate simple markup', () => {
+    it('should generate simple markup', async () => {
       const SuccessfulElement = React.createElement(() => <img />);
       const response = ReactDOMServer.renderToStaticNodeStream(
         SuccessfulElement,
       );
-      expect(response.read().toString()).toMatch(new RegExp('<img' + '/>'));
+      expect(await readDataFromStream(response)).toMatch(new RegExp('<img' + '/>'));
     });
 
     it('should handle errors correctly', () => {
